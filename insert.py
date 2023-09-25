@@ -31,6 +31,9 @@ class DataLoader:
         if user_records:
             self.cursor.executemany("INSERT INTO User (id, has_labels) VALUES (%s, %s)", user_records)
 
+        self.connection.db_connection.commit()
+        print(self.cursor.rowcount, "Record inserted successfully into Laptop table")
+
 
 if __name__ == "__main__":
     loader = DataLoader()
