@@ -15,7 +15,7 @@ class SetupProgram:
         self.cursor.execute(query)
 
         # Create Activity table
-        query = """CREATE TABLE Activity (id INT PRIMARY KEY,
+        query = """CREATE TABLE Activity (id INT PRIMARY KEY AUTO_INCREMENT,
             user_id VARCHAR(255),
             transportation_mode VARCHAR(255),
             start_date_time DATETIME,
@@ -65,6 +65,7 @@ def main():
         program = SetupProgram()
         program.create_tables()
         program.show_tables()
+        # program.drop_table("TrackPoint")
         # program.drop_table("Activity")
         # program.drop_table("User")
     except Exception as e:

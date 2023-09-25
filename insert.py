@@ -5,7 +5,6 @@ from tabulate import tabulate
 import pandas as pd
 
 
-
 class DataLoader:
 
     def __init__(self):
@@ -28,51 +27,51 @@ class DataLoader:
         self.connection.db_connection.commit()
         print(self.cursor.rowcount, "Record inserted successfully into User table")
 
-    def create_datetime(self, date, time):
-        date_time = dt.DateTime(date, time)
-        return date_time
-
-    def match_starttime(self, label_time, trajectory_time):
-        # strip label time of "/" " " and ":"
-        label_time = label_time.replace("/", "")
-        label_time = label_time.replace(" ", "")
-        label_time = label_time.replace(":", "")
-
-
-    # def get_transportation_mode(self, file_name):
-
-    def get_timestamps(self, activity_df):
-        start_date = activity_df.iloc[0,5]
-        start_time = activity_df.iloc[0,6]
+    def get_timestamps(self, df):
+        start_date = df.iloc[0, 5]
+        start_time = df.iloc[0, 6]
         start_date_time = start_date + " " + start_time
-        end_date = df.iloc[-1,5]
-        end_time = df.iloc[-1,6]
+        end_date = df.iloc[-1, 5]
+        end_time = df.iloc[-1, 6]
         end_date_time = end_date + " " + end_time
         return start_date_time, end_date_time
-
     
     def load_activities(self):
-        data_dir = "./dataset"
+        data_dir = "./dataset/Data"
         activity_records = []
 
-        for user_id in os.listdir(data_dir + "/Data"):
-            user_folder = os.listdir(data_dir + "/Data/" + user_id)
-            # if "labels.txt" in user_folder:
-            #     for activity_file in user_folder + "/Trajectory":
-            #         df = pd.read_csv(activity_file, skiprows=6, header=None)
-            #         # get fifth column of df
-            #         start_date_time, end_date_time = get_timestamps(df)
-            # else:
-            for activity_file in user_folder[0] + "/Trajectory":
-                df = pd.read_csv(activity_file, skiprows=6, header=None)
-                # check if df has more than 2500 lines
-                if len(df) <= 2500:
-                    start_date_time, end_date_time = self.get_timestamps(df)
-                    activity_records.append((user_id, file_name, None, start_date_time, end_date_time))
+        for user_id in os.listdir(data_dir):
+            user_dir = data_dir + "/" + user_id
+            labels = {}
 
-        self.cursor.executemany("INSERT INTO Activity (user_id, file_name) VALUES (%s, %s)", activity_records)
-        self.connection.db_connection.commit()
-        print(self.cursor.rowcount, "Record inserted successfully into Activity table")
+            if "labels.txt" in os.listdir(user_dir):
+                with open(user_dir + "/labels.txt", "r") as label_file:
+                    lines = label_file.readlines()
+                    for line in lines[1:]:
+                        start, end, label = line.strip().split("\t")
+                        start, end = start.replace("/", "-"), end.replace("/", "-")
+                        labels[(start, end)] = label
+
+            for activity in os.listdir(user_dir + "/Trajectory"):
+                activity_df = pd.read_csv(user_dir + "/Trajectory/" + activity, skiprows=6, header=None)
+
+                if len(activity_df) > 2500:
+                    continue
+
+                start_date_time, end_date_time = self.get_timestamps(activity_df)
+                transportation_mode = labels.get((start_date_time, end_date_time), None)
+
+                if labels and not transportation_mode:
+                    # label found but no match on times, ignore
+                    continue
+
+                activity_records.append((user_id, transportation_mode, start_date_time, end_date_time))
+
+            self.cursor.executemany("INSERT INTO Activity (user_id, transportation_mode, start_date_time, end_date_time) VALUES (%s, %s, %s, %s)", activity_records)
+            self.connection.db_connection.commit()
+            print(f"{self.cursor.rowcount} records inserted successfully into Activity table (user {user_id})")
+
+            activity_records.clear()
 
 
 if __name__ == "__main__":
