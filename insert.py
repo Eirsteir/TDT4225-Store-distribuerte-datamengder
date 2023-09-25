@@ -60,10 +60,6 @@ class DataLoader:
                 start_date_time, end_date_time = self.get_timestamps(track_points)
                 transportation_mode = labels.get((start_date_time, end_date_time), None)
 
-                # if labels and not transportation_mode:
-                #     # label found but no match on times, ignore
-                #     continue
-
                 activity_record = (user_id, transportation_mode, start_date_time, end_date_time)
 
                 self.cursor.execute("INSERT INTO Activity (user_id, transportation_mode, start_date_time, end_date_time) VALUES (%s, %s, %s, %s)", activity_record)
@@ -80,7 +76,7 @@ class DataLoader:
 
 if __name__ == "__main__":
     loader = DataLoader()
-    # loader.load_users()
+    loader.load_users()
     loader.load_activities()
     loader.connection.close_connection()
 

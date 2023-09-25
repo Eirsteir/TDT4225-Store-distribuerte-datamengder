@@ -11,26 +11,26 @@ class SetupProgram:
 
     def create_tables(self):
         # Create User table
-        query = "CREATE TABLE User (id VARCHAR(255) PRIMARY KEY, has_labels BOOLEAN)"
+        query = "CREATE TABLE IF NOT EXISTS User (id VARCHAR(255) NOT NULL PRIMARY KEY, has_labels BOOLEAN NOT NULL DEFAULT false)"
         self.cursor.execute(query)
 
         # Create Activity table
-        query = """CREATE TABLE Activity (id INT PRIMARY KEY AUTO_INCREMENT,
+        query = """CREATE TABLE IF NOT EXISTS Activity (id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
             user_id VARCHAR(255),
             transportation_mode VARCHAR(255),
-            start_date_time DATETIME,
-            end_date_time DATETIME,
+            start_date_time DATETIME NOT NULL,
+            end_date_time DATETIME NOT NULL,
             FOREIGN KEY (user_id) REFERENCES User(id))"""
         self.cursor.execute(query)
 
         # Create TrackPoint table
-        query = """CREATE TABLE TrackPoint (id INT PRIMARY KEY AUTO_INCREMENT,
+        query = """CREATE TABLE IF NOT EXISTS TrackPoint (id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
             activity_id INT,
             lat DOUBLE,
             lon DOUBLE,
             altitude INT,
-            date_days DOUBLE,
-            date_time DATETIME,
+            date_days DOUBLE NOT NULL,
+            date_time DATETIME NOT NULL,
             FOREIGN KEY (activity_id) REFERENCES Activity(id))"""
         self.cursor.execute(query)
         
