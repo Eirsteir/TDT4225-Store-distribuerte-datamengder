@@ -7,19 +7,19 @@ import pandas as pd
 
 class DataLoader:
 
-    def __init__(self):
+    def __init__(self, data_dir="./dataset"):
         self.connection = DbConnector()
         self.db_connection = self.connection.db_connection
         self.cursor = self.connection.cursor
+        self.data_dir = data_dir
 
     def load_users(self):
-        data_dir = "./dataset"
         user_records = []
 
-        with open(data_dir + "/labeled_ids.txt", "r") as labeled_ids:
+        with open(self.data_dir + "/labeled_ids.txt", "r") as labeled_ids:
             user_ids_with_labels = [line.strip() for line in labeled_ids]
 
-        for user_id in os.listdir(data_dir + "/Data"):
+        for user_id in os.listdir(self.data_dir + "/Data"):
             has_labels = user_id in user_ids_with_labels
             user_records.append((user_id, has_labels))
 
@@ -37,8 +37,7 @@ class DataLoader:
         return start_date_time, end_date_time
     
     def load_activities(self):
-        data_dir = "./dataset/Data"
-        activity_records = []
+        data_dir = self.data_dir + "/Data"
 
         for user_id in os.listdir(data_dir):
             user_dir = data_dir + "/" + user_id
@@ -53,25 +52,30 @@ class DataLoader:
                         labels[(start, end)] = label
 
             for activity in os.listdir(user_dir + "/Trajectory"):
-                activity_df = pd.read_csv(user_dir + "/Trajectory/" + activity, skiprows=6, header=None)
+                track_points = pd.read_csv(user_dir + "/Trajectory/" + activity, skiprows=6, header=None)
 
-                if len(activity_df) > 2500:
+                if len(track_points) > 2500:
                     continue
 
-                start_date_time, end_date_time = self.get_timestamps(activity_df)
+                start_date_time, end_date_time = self.get_timestamps(track_points)
                 transportation_mode = labels.get((start_date_time, end_date_time), None)
 
-                if labels and not transportation_mode:
-                    # label found but no match on times, ignore
-                    continue
+                # if labels and not transportation_mode:
+                #     # label found but no match on times, ignore
+                #     continue
 
-                activity_records.append((user_id, transportation_mode, start_date_time, end_date_time))
+                activity_record = (user_id, transportation_mode, start_date_time, end_date_time)
 
-            self.cursor.executemany("INSERT INTO Activity (user_id, transportation_mode, start_date_time, end_date_time) VALUES (%s, %s, %s, %s)", activity_records)
-            self.connection.db_connection.commit()
-            print(f"{self.cursor.rowcount} records inserted successfully into Activity table (user {user_id})")
+                self.cursor.execute("INSERT INTO Activity (user_id, transportation_mode, start_date_time, end_date_time) VALUES (%s, %s, %s, %s)", activity_record)
 
-            activity_records.clear()
+                activity_id = self.cursor.lastrowid
+                trackpoint_records = [(activity_id, row[0], row[1], row[3], row[4], row[5] + " " + row[6]) for row in track_points.values]
+
+                self.cursor.executemany("INSERT INTO TrackPoint (activity_id, lat, lon, altitude, date_days, date_time) VALUES (%s, %s, %s, %s, %s, %s)", trackpoint_records)
+                print(f"{self.cursor.rowcount} records inserted successfully into TrackPoint table for Activity {activity_id}")
+
+        self.db_connection.commit()
+        print(f"{self.cursor.rowcount} records inserted successfully")
 
 
 if __name__ == "__main__":
