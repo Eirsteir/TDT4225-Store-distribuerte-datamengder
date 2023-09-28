@@ -63,11 +63,11 @@ def main():
     program = None
     try:
         program = SetupProgram()
+        program.drop_table("TrackPoint")
+        program.drop_table("Activity")
+        program.drop_table("User")
         program.create_tables()
         program.show_tables()
-        # program.drop_table("TrackPoint")
-        # program.drop_table("Activity")
-        # program.drop_table("User")
     except Exception as e:
         print("ERROR: Failed to use database:", e)
     finally:
