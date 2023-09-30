@@ -52,6 +52,29 @@ class Queries:
         result = self.cursor.fetchall()
         print(f"Users taken the bus: \n{result}")
 
+    def query_five(self):
+        query = "SELECT User.id, " \
+                "   COUNT(DISTINCT Activity.transportation_mode) AS transport_count " \
+                "FROM User " \
+                "INNER JOIN Activity ON User.id = Activity.user_id " \
+                "WHERE Activity.transportation_mode IS NOT NULL " \
+                "GROUP BY User.id " \
+                "ORDER BY transport_count DESC " \
+                "LIMIT 10"
+        self.cursor.execute(query)
+        result = self.cursor.fetchall()
+        print(f"Top 10 users with different transportation modes: \n{tabulate(result, ['User ID', 'Number of transportation modes'])}")
+
+    def query_six(self):
+        query = "SELECT user_id, transportation_mode, start_date_time, end_date_time " \
+                "FROM Activity " \
+                "GROUP BY user_id, transportation_mode, start_date_time, end_date_time " \
+                "HAVING COUNT(*) > 1;"
+        self.cursor.execute(query)
+        result = self.cursor.fetchall()
+        print(f"duplicates: \n{tabulate(result)} ")
+
+
 
 def main():
     program = None
@@ -65,6 +88,8 @@ def main():
         program.query_two()
         program.query_three()
         program.query_four()
+        program.query_five()
+        program.query_six()
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
