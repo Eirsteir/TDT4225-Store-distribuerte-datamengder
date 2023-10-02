@@ -1,4 +1,5 @@
 import argparse
+import itertools
 from tabulate import tabulate
 from DbConnector import DbConnector
 import pandas as pd
@@ -100,39 +101,37 @@ class Queries:
 
     # Assuming that the task wants us to find each single person who has been close to any other person both in time and space
     def query_eight(self):
-        query = (
-            "SELECT * "
-            "FROM TrackPoint "
-            "INNER JOIN Activity ON TrackPoint.activity_id = Activity.id "
-            "GROUP BY Activity.user_id, TrackPoint.latitude, TrackPoint.longitude "
-        )
+        query = """SELECT Activity.user_id, TrackPoint.date_time, TrackPoint.lat, TrackPoint.lon 
+                   FROM TrackPoint 
+                   INNER JOIN Activity ON TrackPoint.activity_id = Activity.id 
+                   GROUP BY Activity.user_id, TrackPoint.date_time, TrackPoint.lat, TrackPoint.lon 
+                """
+        
         df = pd.read_sql(query, self.db_connection)
-        
-        # Convert lat/long to meters
-        df['coordinates_meters'] = df.apply(
-            lambda row: geodesic((0, 0), (row['latitude'], row['longitude'])).meters, axis=1
-        )
-        
-        # Split into separate x and y columns for easier use with cKDTree
-        df[['x', 'y']] = pd.DataFrame(df['coordinates_meters'].tolist(), index=df.index)
-        
-        # Build a k-d tree for efficient nearest neighbor search
-        tree = cKDTree(df[['x', 'y']].values)
-        
-        # Query the tree to find points within 50 meters of each other
-        pairs = tree.query_pairs(50)
-        
-        # Extract indices of rows to keep
-        indices_to_keep = set()
-        for pair in pairs:
-            indices_to_keep.add(pair[0])
-            indices_to_keep.add(pair[1])
-        
-        # Filter dataframe to keep only rows within 50 meters of another row
-        df_filtered = df.iloc[list(indices_to_keep)]
-        
-        return df_filtered
-        print(df_filtered)
+        df = df.sort_values(by=['user_id', 'date_time'])
+        df['datetime'] = pd.to_datetime(df['date_time'])  # Corrected column name
+
+        unique_user_ids = set()
+
+        # Get all unique pairs of rows
+        for (i, row), (j, other_row) in itertools.combinations(df.iterrows(), 2):
+            print(f"i: {i}, j: {j}")
+            # Calculate spatial and temporal distances
+            spatial_distance = geodesic((row['lat'], row['lon']), (other_row['lat'], other_row['lon'])).meters
+            temporal_distance = abs((row['datetime'] - other_row['datetime']).total_seconds())
+            
+            # Check proximity conditions
+            if spatial_distance <= 50 and temporal_distance <= 30:
+                # Make sure it doesn't consider the same user id
+                if row['user_id'] != other_row['user_id']:
+                    unique_user_ids.add(row['user_id'], other_row['user_id'])
+                    print(unique_user_ids)
+
+        print(unique_user_ids)
+        count_unique_user_ids = len(unique_user_ids)
+        print(f"Number of unique user ids: {count_unique_user_ids}")
+        return count_unique_user_ids
+
 
 
 
