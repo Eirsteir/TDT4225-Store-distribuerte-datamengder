@@ -1,5 +1,6 @@
 from tabulate import tabulate
 from DbConnector import DbConnector
+import pandas
 
 
 class Queries:
@@ -72,9 +73,27 @@ class Queries:
                 "HAVING COUNT(*) > 1;"
         self.cursor.execute(query)
         result = self.cursor.fetchall()
+
         print(f"duplicates: \n{tabulate(result)} ")
 
+    def query_nine(self):
+        query_altitude_trackpoint = "SELECT Activity.user_id, activity_id, altitude " \
+                                    "FROM TrackPoint " \
+                                    "JOIN Activity ON Activity.id = TrackPoint.activity_id " \
 
+        df = pandas.read_sql(query_altitude_trackpoint, self.db_connection)
+        # handle invalid values
+        df = df[df['altitude'] != -777]
+        # diff(): calculates the difference between current and prev row on altitude ie. altitude difference
+        df['altitude_gain'] = df.groupby(['user_id', 'activity_id'])['altitude'].diff()
+        # replace negative gains with 0
+        df['altitude_gain'] = df['altitude_gain'].apply(lambda x: x if x > 0 else 0)
+        # summing up altitude gains, now only positive values
+        total_altitude_gain = df.groupby('user_id')['altitude_gain'].sum().reset_index()
+        # sort users by gain
+        sorted_users = total_altitude_gain.sort_values(by='altitude_gain', ascending=False)
+        top_15_users = sorted_users.head(15)
+        print(top_15_users)
 
 def main():
     program = None
@@ -90,6 +109,7 @@ def main():
         program.query_four()
         program.query_five()
         program.query_six()
+        program.query_nine()
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
