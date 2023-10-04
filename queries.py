@@ -17,27 +17,26 @@ class Queries:
         print(f"Entries in {table_name}: {result[0]}")
 
     def query_two(self):
-        number_of_trackpoints_per_user = "SELECT User.id, " \
+        number_of_trackpoints_per_user = "SELECT Activity.user_id, " \
                                          "  COUNT(TrackPoint.id) AS Number_of_trackpoints " \
-                                         "FROM User " \
-                                         "INNER JOIN Activity ON User.id = Activity.user_id " \
+                                         "FROM Activity " \
                                          "INNER JOIN TrackPoint ON Activity.id = TrackPoint.activity_id " \
-                                         "GROUP BY User.id"
+                                         "GROUP BY Activity.user_id"
 
         query = "SELECT AVG(Number_of_trackpoints), " \
                 "       MAX(Number_of_trackpoints), " \
                 "       MIN(Number_of_trackpoints) " \
                 "FROM ( %s ) AS number_of_trackpoints_per_user_query"
         self.cursor.execute(query % number_of_trackpoints_per_user)
-        result = self.cursor.fetchall()
-        print(f"Average, maximum and minimum trackpoints per user")
+        result = self.cursor.fetchone()
+        average, maximum, minimum = result
+        print(f"Average: {average}, maximum: {maximum} and minimum: {minimum} trackpoints per user")
 
     def query_three(self):
-        query = "SELECT User.id, " \
+        query = "SELECT Activity.user_id, " \
                 "   COUNT(Activity.id) AS Number_of_activities  " \
-                "FROM User " \
-                "INNER JOIN Activity ON User.id = Activity.user_id " \
-                "GROUP BY User.id " \
+                "FROM Activity " \
+                "GROUP BY Activity.user_id " \
                 "ORDER BY Number_of_activities DESC " \
                 "LIMIT 15"
         self.cursor.execute(query)
@@ -45,21 +44,22 @@ class Queries:
         print(f"Top 15 users with the highest number of activities: \n{tabulate(result, ['User ID', 'Number of Activities'])}")
 
     def query_four(self):
-        query = "SELECT DISTINCT User.id " \
-                "FROM User " \
-                "INNER JOIN Activity ON User.id = Activity.user_id " \
-                "WHERE Activity.transportation_mode = 'bus'"
+        query = "SELECT DISTINCT user_id " \
+                "FROM Activity " \
+                "WHERE transportation_mode = 'bus'"
         self.cursor.execute(query)
         result = self.cursor.fetchall()
-        print(f"Users taken the bus: \n{result}")
+        print(f"Users taken the bus:")
+        for user in result:
+            print(user[0])
+
 
     def query_five(self):
-        query = "SELECT User.id, " \
-                "   COUNT(DISTINCT Activity.transportation_mode) AS transport_count " \
-                "FROM User " \
-                "INNER JOIN Activity ON User.id = Activity.user_id " \
-                "WHERE Activity.transportation_mode IS NOT NULL " \
-                "GROUP BY User.id " \
+        query = "SELECT user_id, " \
+                "   COUNT(DISTINCT transportation_mode) AS transport_count " \
+                "FROM Activity " \
+                "WHERE transportation_mode IS NOT NULL " \
+                "GROUP BY user_id " \
                 "ORDER BY transport_count DESC " \
                 "LIMIT 10"
         self.cursor.execute(query)
@@ -74,7 +74,7 @@ class Queries:
         self.cursor.execute(query)
         result = self.cursor.fetchall()
 
-        print(f"duplicates: \n{tabulate(result)} ")
+        print(f"Duplicates: \n{tabulate(result)} ")
 
     def query_nine(self):
         query_altitude_trackpoint = "SELECT Activity.user_id, activity_id, altitude " \
