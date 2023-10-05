@@ -118,7 +118,7 @@ class Queries:
         query = """
             SELECT
                 a.user_id,
-                COUNT(a.id) as invalid_activities
+                COUNT(DISTINCT a.id) as invalid_activities
             FROM
                 Activity a
             JOIN TrackPoint t1 ON

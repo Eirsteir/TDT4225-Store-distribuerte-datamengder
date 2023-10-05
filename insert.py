@@ -56,9 +56,8 @@ class DataLoader:
             for activity in os.listdir(user_dir + "/Trajectory"):
                 track_points = pd.read_csv(user_dir + "/Trajectory/" + activity, skiprows=6, header=None)
 
-                # truncate the track points to the max allowed per activity if necessary
-                truncation_cutoff = min(self.MAX_TRACK_POINTS_PER_ACTIVITY, len(track_points))
-                track_points = track_points.iloc[:truncation_cutoff]
+                if len(track_points) > 2500:
+                    continue
 
                 start_date_time, end_date_time = self.get_timestamps(track_points)
                 transportation_mode = labels.get((start_date_time, end_date_time), None)
