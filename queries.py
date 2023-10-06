@@ -1,3 +1,10 @@
+import argparse
+import itertools
+from tabulate import tabulate
+from DbConnector import DbConnector
+import pandas as pd
+import numpy as np
+
 import pandas as pd
 from tabulate import tabulate
 from DbConnector import DbConnector
@@ -76,6 +83,54 @@ class Queries:
         self.cursor.execute(query)
         result = self.cursor.fetchall()
         print(f"duplicates: \n{tabulate(result)} ")
+
+    def query_seven(self):
+        subquery = "select user_id, transportation_mode, start_date_time, end_date_time " \
+                "from Activity " \
+                "where DATE(end_date_time) > DATE(start_date_time)"
+                                
+        query_a = "select COUNT(DISTINCT user_id) AS user_count " \
+                "from ( %s ) as subquery "
+        self.cursor.execute(query_a % subquery)
+        result_a = self.cursor.fetchall()
+
+        print(f"Number of users who have activities spanning two dates: \n{tabulate(result_a)}")
+
+        query_b = "SELECT user_id, transportation_mode, TIMESTAMPDIFF(SECOND, start_date_time, end_date_time) AS duration " \
+                "FROM ( %s ) AS subquery "
+        
+        self.cursor.execute(query_b % subquery)
+        result_b = self.cursor.fetchall()
+        print(f"Duration of activities spanning two dates: \n{tabulate(result_b)}")
+
+    # Assuming that the task wants us to find each single person who has been close to any other person both in time and space
+    def query_eight(self):
+        query = """SELECT Activity.user_id, TrackPoint.date_time, TrackPoint.lat, TrackPoint.lon 
+                   FROM TrackPoint 
+                   INNER JOIN Activity ON TrackPoint.activity_id = Activity.id 
+                   ORDER BY TrackPoint.date_time 
+                """
+        
+        df = pd.read_sql(query, self.db_connection)
+
+        def haversine(lat1, lon1, lat2, lon2, radius=6371):
+            """
+            Calculate the distance between two points on a sphere using the Haversine formula.
+            """
+            dlat = np.radians(lat2 - lat1)
+            dlon = np.radians(lon2 - lon1)
+            a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon / 2) ** 2
+            c = 2 * np.arcsin(np.sqrt(a))
+            return radius * c
+
+        df['distance'] = haversine(df['lat'].shift(), df['lon'].shift(), df['lat'], df['lon'])
+        df["time_diff"] = df.groupby("user_id")["date_time"].diff()
+
+        m1 = df["time_diff"] <= pd.Timedelta(seconds=30)
+        m3 = df["user_id"] != df["user_id"].shift()
+        m2 = df["distance"] <= 50
+        n_unique = df[m1 & m2 & m3]["user_id"].nunique()
+        print(f"Number of unique user ids: {n_unique}")
 
     def query_nine(self):
         query_altitude_trackpoint = "SELECT Activity.user_id, activity_id, altitude " \
@@ -200,19 +255,34 @@ def main():
     try:
         program = Queries()
         table_names = ["Activity", "TrackPoint", "User"]
-
-        for name in table_names:
-            program.query_one(table_name=name)
-
-        # program.query_two()
-        # program.query_three()
-        # program.query_four()
-        # program.query_five()
-        # program.query_six()
-        # program.query_nine()
-        program.query_10_longest_distances_per_transportation_mode_per_day()
-        program.query_11_users_with_invalid_activities()
-        program.query_12_users_with_their_most_used_transportation_mode()
+        # cleanly run queries based on argument
+        if query == 1:
+            for name in table_names:
+                program.query_one(table_name=name)
+        elif query == 2:
+            program.query_two()
+        elif query == 3:
+            program.query_three()
+        elif query == 4:
+            program.query_four()
+        elif query == 5:
+            program.query_five()
+        elif query == 6:
+            program.query_six()
+        elif query == 7:
+            program.query_seven()
+        elif query == 8:
+            program.query_eight()
+        elif query == 9:
+            program.query_nine()
+        elif query == 10:
+            program.query_10_longest_distances_per_transportation_mode_per_day()
+        elif query == 11:
+            program.query_11_users_with_invalid_activities()
+        elif query == 12:
+            program.query_12_users_with_their_most_used_transportation_mode()
+        else:
+            print("ERROR: Invalid query number")
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
@@ -222,4 +292,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Use args to be able to choose which query you want to run
+    parser = argparse.ArgumentParser(description="Choose query")
+    parser.add_argument("-query", type=int, help="Choose query")
+    args = parser.parse_args()
+    main(args.query)
