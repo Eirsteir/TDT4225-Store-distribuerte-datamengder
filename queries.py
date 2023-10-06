@@ -4,8 +4,8 @@ from tabulate import tabulate
 from DbConnector import DbConnector
 import pandas as pd
 import numpy as np
-from scipy.spatial import cKDTree
-from geopy.distance import geodesic
+# from scipy.spatial import cKDTree
+# from geopy.distance import geodesic
 
 
 class Queries:
@@ -104,34 +104,29 @@ class Queries:
         query = """SELECT Activity.user_id, TrackPoint.date_time, TrackPoint.lat, TrackPoint.lon 
                    FROM TrackPoint 
                    INNER JOIN Activity ON TrackPoint.activity_id = Activity.id 
-                   GROUP BY Activity.user_id, TrackPoint.date_time, TrackPoint.lat, TrackPoint.lon 
+                   ORDER BY TrackPoint.date_time 
                 """
         
         df = pd.read_sql(query, self.db_connection)
-        df = df.sort_values(by=['user_id', 'date_time'])
-        df['datetime'] = pd.to_datetime(df['date_time'])  # Corrected column name
 
-        unique_user_ids = set()
+        def haversine(lat1, lon1, lat2, lon2, radius=6371):
+            """
+            Calculate the distance between two points on a sphere using the Haversine formula.
+            """
+            dlat = np.radians(lat2 - lat1)
+            dlon = np.radians(lon2 - lon1)
+            a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon / 2) ** 2
+            c = 2 * np.arcsin(np.sqrt(a))
+            return radius * c
 
-        # Get all unique pairs of rows
-        for (i, row), (j, other_row) in itertools.combinations(df.iterrows(), 2):
-            print(f"i: {i}, j: {j}")
-            # Calculate spatial and temporal distances
-            spatial_distance = geodesic((row['lat'], row['lon']), (other_row['lat'], other_row['lon'])).meters
-            temporal_distance = abs((row['datetime'] - other_row['datetime']).total_seconds())
-            
-            # Check proximity conditions
-            if spatial_distance <= 50 and temporal_distance <= 30:
-                # Make sure it doesn't consider the same user id
-                if row['user_id'] != other_row['user_id']:
-                    unique_user_ids.add(row['user_id'], other_row['user_id'])
-                    print(unique_user_ids)
+        df['distance'] = haversine(df['lat'].shift(), df['lon'].shift(), df['lat'], df['lon'])
+        df["time_diff"] = df.groupby("user_id")["date_time"].diff()
 
-        print(unique_user_ids)
-        count_unique_user_ids = len(unique_user_ids)
-        print(f"Number of unique user ids: {count_unique_user_ids}")
-        return count_unique_user_ids
-
+        m1 = df["time_diff"] <= pd.Timedelta(seconds=30)
+        m3 = df["user_id"] != df["user_id"].shift()
+        m2 = df["distance"] <= 50
+        n_unique = df[m1 & m2 & m3]["user_id"].nunique()
+        print(f"Number of unique user ids: {n_unique}")
 
 
 
@@ -172,6 +167,7 @@ def main(query: int):
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
+        raise e
     finally:
         if program:
             program.connection.close_connection()
